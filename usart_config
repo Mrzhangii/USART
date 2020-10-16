@@ -1,0 +1,52 @@
+void uart3_init(u32 bound)
+{  	 
+	  //定义三个结构体，用来初始化GPIO，USART，NVIC
+    GPIO_InitTypeDef GPIO_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+	 
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);	//使能UGPIOB时钟
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);	//使能USART3时钟
+	//USART3_TX  
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10; //PB.10
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;	//复用推挽输出
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+   
+  //USART3_RX	  
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;//PB11
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//浮空输入
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+   //USART 初始化设置
+	USART_InitStructure.USART_BaudRate = bound;//串口波特率
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;//字长为8位数据格式
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;//一个停止位
+	USART_InitStructure.USART_Parity = USART_Parity_No;//无奇偶校验位
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//无硬件数据流控制
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//收发模式
+  USART_Init(USART3, &USART_InitStructure);     //初始化串口3
+  USART_Cmd(USART3, ENABLE);                    //使能串口3  
+    /*****想要开启中断的话,加入下面及几句话******/
+   USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);//开启串口接受中断
+    //Usart3 NVIC 配置
+    NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=0 ;//抢占优先级
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;		//子优先级
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			  //IRQ通道使能
+	NVIC_Init(&NVIC_InitStructure);	//根据指定的参数初始化VIC寄存器
+}
+/*************************************************************
+若不采用中断，可以中一直检测，寄存器的状态标志位，达到及时传输的目的
+*************************************************************/
+void USART3_IRQHandler(void)
+{
+    u8 res;
+    if(USART_GetITStatus(USART3,USART_IT_RXNE))
+    {
+        //读写函数自己定义
+        res=USART_ReceiveDate(USART1);//USART3->DR寄存器
+        USART_SendData(USART1，res);
+    }
+}
+//自定义发送，接受函数时，比如发送函数，需要根据数据类型，放在数组中，在传输到USART3->DR寄存器
